@@ -7,6 +7,9 @@ public class Program
 	public const string QUIT = "QUIT";
 	public const string LOOK = "LOOK";
 	public const string GO = "GO";
+	public const string TAKE = "TAKE";
+	public const string DROP = "DROP";
+	public const string INVENTORY = "INVENTORY";
 
 	public static void Main()
 	{
@@ -17,10 +20,18 @@ public class Program
 		entrance.Connect(EAST, gallery);
 		gallery.Connect(NORTH, archive);
 
+		Item oldCoin = new Item("Old Coin", "A tarnished coin stamped with a forgotten crest.");
+		Item copperRing = new Item("Copper Ring", "A small ring with a dull copper finish.");
+		Item brassToken = new Item("Brass Token", "A square brass token etched with a small tower.");
+
+		gallery.PlaceItem(oldCoin);
+		gallery.PlaceItem(copperRing);
+		archive.PlaceItem(brassToken);
+
 		Player player = new Player(entrance);
 
-		Console.WriteLine("Adventure Game — Movement Lab");
-		Console.WriteLine($"Commands: {GO} <direction>, {LOOK}, {QUIT}.");
+		Console.WriteLine("Adventure Game — Inventory Lab");
+		Console.WriteLine($"Commands: {GO} <direction>, {LOOK}, {TAKE} <item name>, {DROP} <item name>, {INVENTORY}, {QUIT}.");
 
 		ShowRoom(player.CurrentRoom);
 
@@ -32,7 +43,7 @@ public class Program
 
 			if (normalized.Length == 0)
 			{
-				Console.WriteLine($"Enter {GO} <direction>, {LOOK}, or {QUIT}.");
+				Console.WriteLine($"Enter {GO} <direction>, {LOOK}, {TAKE} <item name>, {DROP} <item name>, {INVENTORY}, or {QUIT}.");
 				continue;
 			}
 
@@ -87,7 +98,47 @@ public class Program
 				continue;
 			}
 
-			Console.WriteLine($"Unknown command. Use {GO} <direction>, {LOOK}, or {QUIT}.");
+			if (command == TAKE)
+			{
+				if (words.Length < 2)
+				{
+					Console.WriteLine($"Use {TAKE} followed by an item name.");
+					continue;
+				}
+
+				string itemName = string.Join(" ", words, 1, words.Length - 1);
+				player.TryTake(itemName, out string message);
+				Console.WriteLine(message);
+				continue;
+			}
+
+			if (command == DROP)
+			{
+				if (words.Length < 2)
+				{
+					Console.WriteLine($"Use {DROP} followed by an item name.");
+					continue;
+				}
+
+				string itemName = string.Join(" ", words, 1, words.Length - 1);
+				player.TryDrop(itemName, out string message);
+				Console.WriteLine(message);
+				continue;
+			}
+
+			if (command == INVENTORY)
+			{
+				if (words.Length != 1)
+				{
+					Console.WriteLine($"{INVENTORY} takes no arguments.");
+					continue;
+				}
+
+				ShowInventory(player);
+				continue;
+			}
+
+			Console.WriteLine($"Unknown command. Use {GO} <direction>, {LOOK}, {TAKE} <item name>, {DROP} <item name>, {INVENTORY}, or {QUIT}.");
 		}
 	}
 
@@ -103,5 +154,30 @@ public class Program
 		Console.WriteLine($"  {SOUTH}: {room.South?.Name ?? "(none)"}");
 		Console.WriteLine($"   {EAST}: {room.East?.Name ?? "(none)"}");
 		Console.WriteLine($"   {WEST}: {room.West?.Name ?? "(none)"}");
+
+		if (room.Items.Count == 0)
+		{
+			Console.WriteLine("  Items: (none)");
+			return;
+		}
+
+		string itemList = string.Join(", ", room.Items.Select(item => item.Name));
+		Console.WriteLine($"  Items: {itemList}");
+	}
+
+	public static void ShowInventory(Player player)
+	{
+		if (player.Inventory.Count == 0)
+		{
+			Console.WriteLine("Inventory: (empty)");
+			return;
+		}
+
+		Console.WriteLine("Inventory:");
+
+		foreach (Item item in player.Inventory)
+		{
+			Console.WriteLine($"  - {item.Name}: {item.Description}");
+		}
 	}
 }

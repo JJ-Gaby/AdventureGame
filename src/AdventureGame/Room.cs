@@ -10,6 +10,10 @@ public class Room
 	public string Name { get; }
 	public string Description { get; set; }
 
+	private readonly List<Item> _items = new List<Item>();
+
+	public IReadOnlyList<Item> Items => _items.AsReadOnly();
+
 	public Room? North { get; private set; }
 	public Room? South { get; private set; }
 	public Room? East { get; private set; }
@@ -78,5 +82,35 @@ public class Room
 			case WEST: West = neighbor; break;
 			default: throw new ArgumentException($"Use {NORTH}, {SOUTH}, {EAST}, or {WEST}.", nameof(direction));
 		}
+	}
+	public void PlaceItem(Item item)
+	{
+		ArgumentNullException.ThrowIfNull(item);
+
+		if (_items.Exists(current => ReferenceEquals(current, item)))
+		{
+			throw new InvalidOperationException("This room already contains the item.");
+		}
+
+		_items.Add(item);
+	}
+
+	public void RemoveItem(Item item)
+	{
+		ArgumentNullException.ThrowIfNull(item);
+
+		int itemIndex = _items.FindIndex(current => ReferenceEquals(current, item));
+
+		if (itemIndex < 0)
+		{
+			throw new InvalidOperationException("This room does not contain the item.");
+		}
+
+		_items.RemoveAt(itemIndex);
+	}
+
+	public Item? FindItem(string itemName)
+	{
+		return _items.Find(item => string.Equals(item.Name, itemName, StringComparison.OrdinalIgnoreCase));
 	}
 }
