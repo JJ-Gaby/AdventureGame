@@ -1,4 +1,6 @@
+using static AdventureGame.ICommand;
 using static AdventureGame.Room;
+using System.Collections.Generic;
 
 namespace AdventureGame;
 
@@ -30,6 +32,15 @@ public class Program
 
 		Player player = new Player(entrance);
 
+		IReadOnlyList<ICommand> commands = new ICommand[]
+		{
+			new GoCommand(),
+			new LookCommand(),
+			new TakeCommand(),
+			new DropCommand(),
+			new InventoryCommand()
+		};
+
 		Console.WriteLine("Adventure Game — Darkness and Grue Lab");
 		Console.WriteLine($"Commands: {GO} <direction>, {LOOK}, {TAKE} <item name>, {DROP} <item name>, {INVENTORY}, {QUIT}.");
 
@@ -42,97 +53,52 @@ public class Program
 
 			if (normalized.Length == 0)
 			{
-				Console.WriteLine($"Enter {GO} <direction>, {LOOK}, {TAKE} <item name>, {DROP} <item name>, {INVENTORY}, or {QUIT}.");
+				Console.WriteLine($"Enter {GO} <direction>, {LOOK}, {TAKE} <item name>, " +
+					$"{DROP} <item name>, {INVENTORY}, or {QUIT}.");
 				continue;
 			}
 
 			string[] words = normalized.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
-			string command = words[0];
+			string verb = words[0];
 			string target = words.Length > 1 ? string.Join(" ", words, 1, words.Length - 1) : "";
-			string? syntaxError = null;
 
-			// Phase 1: recognize the verb and check argument structure only.
-			if (command == QUIT || command == LOOK || command == INVENTORY)
+			if (verb == QUIT)
 			{
 				if (words.Length != 1)
 				{
-					syntaxError = $"{command} takes no arguments.";
+					Console.WriteLine($"{QUIT} takes no arguments.");
+					continue;
 				}
-			}
-			else if (command == GO)
-			{
-				if (words.Length != 2)
-				{
-					syntaxError = $"Use {GO} followed by one direction.";
-				}
-			}
-			else if (command == TAKE || command == DROP)
-			{
-				if (words.Length < 2)
-				{
-					syntaxError = $"Use {command} followed by an item name.";
-				}
-			}
-			else
-			{
-				syntaxError = $"Unknown command. Use {GO} <direction>, {LOOK}, {TAKE} <item name>, " +
-					$"{DROP} <item name>, {INVENTORY}, or {QUIT}.";
+
+				Console.WriteLine("You leave the dungeon.");
+				break;
 			}
 
-			if (syntaxError is not null)
+			ICommand? selected = FindCommand(verb, commands);
+
+			if (selected is null)
 			{
-				Console.WriteLine(syntaxError);
+				Console.WriteLine($"Unknown command. Use {GO} <direction>, {LOOK}, {TAKE} <item name>, " +
+					$"{DROP} <item name>, {INVENTORY}, or {QUIT}.");
 				continue;
 			}
 
-			// Phase 2: identify safe exceptions and resolve the Grue hazard.
-			bool safeInDarkness = command == QUIT || (command == GO && target == player.ReturnDirection);
-
-			if (!player.CurrentRoom.IsLit && !safeInDarkness)
+			if (!selected.HasValidArguments(words, out string syntaxMessage))
 			{
-				Console.WriteLine(DescribeGrueEncounter(command));
+				Console.WriteLine(syntaxMessage);
+				continue;
+			}
+
+			bool safeRetreat = verb == GO && target == player.ReturnDirection;
+
+			if (!player.CurrentRoom.IsLit && !safeRetreat)
+			{
+				Console.WriteLine(selected.DescribeInterruptedAttempt());
 				Console.WriteLine("A Grue devours you. You have been defeated.");
 				break;
 			}
 
-			// Phase 3: let existing domain operations decide normal success or failure.
-			if (command == QUIT)
-			{
-				Console.WriteLine("You leave the dungeon.");
-				break;
-			}
-			else if (command == LOOK)
-			{
-				ShowRoom(player.CurrentRoom);
-			}
-			else if (command == INVENTORY)
-			{
-				ShowInventory(player);
-			}
-			else if (command == GO)
-			{
-				bool moved = player.TryMove(target, out string message);
-				Console.WriteLine(message);
-
-				if (moved)
-				{
-					ShowRoom(player.CurrentRoom);
-				}
-				else
-				{
-					Console.WriteLine($"You remain in {player.CurrentRoom.Name}.");
-				}
-			}
-			else if (command == TAKE)
-			{
-				player.TryTake(target, out string message);
-				Console.WriteLine(message);
-			}
-			else if (command == DROP)
-			{
-				player.TryDrop(target, out string message);
-				Console.WriteLine(message);
-			}
+			selected.Execute(player, target);
 		}
 	}
 
@@ -181,29 +147,17 @@ public class Program
 		}
 	}
 
-	private static string DescribeGrueEncounter(string command)
+
+	private static ICommand? FindCommand(string verb, IReadOnlyList<ICommand> commands)
 	{
-		if (command == GO)
+		foreach (ICommand candidate in commands)
 		{
-			return "You rush blindly ahead and stumble upon an angry woken-up beast.";
+			if (candidate.Verb == verb)
+			{
+				return candidate;
+			}
 		}
 
-		if (command == INVENTORY)
-		{
-			return "You rummage through your belongings looking for something, but something else finds you first.";
-		}
-
-		if (command == DROP)
-		{
-			return "You drop one of your belongings. The sound it makes echoes and serves as a beacon for the thing that lurks in the darkness.";
-		}
-
-		if (command == TAKE)
-		{
-			return "You reach into the blackness. Something reaches back.";
-		}
-
-		// if (command == LOOK)
-		return "As you look into the darkness, the darkness stares back at you.";
+		return null;
 	}
 }
