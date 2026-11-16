@@ -6,6 +6,8 @@ public class Player
 {
 	public Room CurrentRoom { get; private set; }
 
+	public string? ReturnDirection { get; private set; }
+
 	private readonly List<Item> _inventory = new List<Item>();
 
 	public IReadOnlyList<Item> Inventory => _inventory.AsReadOnly();
@@ -31,6 +33,7 @@ public class Player
 			return false;
 		}
 
+		ReturnDirection = Room.GetReciprocalDirection(direction);
 		CurrentRoom = destination;
 		message = $"You move {direction} to {CurrentRoom.Name}.";
 		return true;

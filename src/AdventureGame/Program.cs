@@ -15,7 +15,7 @@ public class Program
 	{
 		Room entrance = new Room("Entrance", "A dry stone chamber with daylight spilling through the doorway.");
 		Room gallery = new Room("Gallery", "A long gallery lined with faded banners.");
-		Room archive = new Room("Archive", "An archive whose shelves hold dust-covered chronicles.");
+		Room archive = new Room("Archive", "An archive whose shelves hold dust-covered chronicles.", false);
 
 		entrance.Connect(EAST, gallery);
 		gallery.Connect(NORTH, archive);
@@ -30,7 +30,7 @@ public class Program
 
 		Player player = new Player(entrance);
 
-		Console.WriteLine("Adventure Game — Inventory Lab");
+		Console.WriteLine("Adventure Game — Darkness and Grue Lab");
 		Console.WriteLine($"Commands: {GO} <direction>, {LOOK}, {TAKE} <item name>, {DROP} <item name>, {INVENTORY}, {QUIT}.");
 
 		ShowRoom(player.CurrentRoom);
@@ -38,7 +38,6 @@ public class Program
 		while (true)
 		{
 			Console.Write("> ");
-
 			string normalized = NormalizeInput(Console.ReadLine());
 
 			if (normalized.Length == 0)
@@ -49,41 +48,70 @@ public class Program
 
 			string[] words = normalized.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
 			string command = words[0];
+			string target = words.Length > 1 ? string.Join(" ", words, 1, words.Length - 1) : "";
+			string? syntaxError = null;
 
-			if (command == QUIT)
+			// Phase 1: recognize the verb and check argument structure only.
+			if (command == QUIT || command == LOOK || command == INVENTORY)
 			{
 				if (words.Length != 1)
 				{
-					Console.WriteLine($"{QUIT} takes no arguments.");
-					continue;
+					syntaxError = $"{command} takes no arguments.";
 				}
-
-				Console.WriteLine("You leave the dungeon.");
-				break;
 			}
-
-			if (command == LOOK)
-			{
-				if (words.Length != 1)
-				{
-					Console.WriteLine($"{LOOK} takes no arguments.");
-					continue;
-				}
-
-				ShowRoom(player.CurrentRoom);
-				continue;
-			}
-
-			if (command == GO)
+			else if (command == GO)
 			{
 				if (words.Length != 2)
 				{
-					Console.WriteLine($"Use {GO} followed by one direction: {NORTH}, {SOUTH}, {EAST}, or {WEST}.");
-					continue;
+					syntaxError = $"Use {GO} followed by one direction.";
 				}
+			}
+			else if (command == TAKE || command == DROP)
+			{
+				if (words.Length < 2)
+				{
+					syntaxError = $"Use {command} followed by an item name.";
+				}
+			}
+			else
+			{
+				syntaxError = $"Unknown command. Use {GO} <direction>, {LOOK}, {TAKE} <item name>, " +
+					$"{DROP} <item name>, {INVENTORY}, or {QUIT}.";
+			}
 
-				string direction = words[1];
-				bool moved = player.TryMove(direction, out string message);
+			if (syntaxError is not null)
+			{
+				Console.WriteLine(syntaxError);
+				continue;
+			}
+
+			// Phase 2: identify safe exceptions and resolve the Grue hazard.
+			bool safeInDarkness = command == QUIT || (command == GO && target == player.ReturnDirection);
+
+			if (!player.CurrentRoom.IsLit && !safeInDarkness)
+			{
+				Console.WriteLine(DescribeGrueEncounter(command));
+				Console.WriteLine("A Grue devours you. You have been defeated.");
+				break;
+			}
+
+			// Phase 3: let existing domain operations decide normal success or failure.
+			if (command == QUIT)
+			{
+				Console.WriteLine("You leave the dungeon.");
+				break;
+			}
+			else if (command == LOOK)
+			{
+				ShowRoom(player.CurrentRoom);
+			}
+			else if (command == INVENTORY)
+			{
+				ShowInventory(player);
+			}
+			else if (command == GO)
+			{
+				bool moved = player.TryMove(target, out string message);
 				Console.WriteLine(message);
 
 				if (moved)
@@ -94,51 +122,17 @@ public class Program
 				{
 					Console.WriteLine($"You remain in {player.CurrentRoom.Name}.");
 				}
-
-				continue;
 			}
-
-			if (command == TAKE)
+			else if (command == TAKE)
 			{
-				if (words.Length < 2)
-				{
-					Console.WriteLine($"Use {TAKE} followed by an item name.");
-					continue;
-				}
-
-				string itemName = string.Join(" ", words, 1, words.Length - 1);
-				player.TryTake(itemName, out string message);
+				player.TryTake(target, out string message);
 				Console.WriteLine(message);
-				continue;
 			}
-
-			if (command == DROP)
+			else if (command == DROP)
 			{
-				if (words.Length < 2)
-				{
-					Console.WriteLine($"Use {DROP} followed by an item name.");
-					continue;
-				}
-
-				string itemName = string.Join(" ", words, 1, words.Length - 1);
-				player.TryDrop(itemName, out string message);
+				player.TryDrop(target, out string message);
 				Console.WriteLine(message);
-				continue;
 			}
-
-			if (command == INVENTORY)
-			{
-				if (words.Length != 1)
-				{
-					Console.WriteLine($"{INVENTORY} takes no arguments.");
-					continue;
-				}
-
-				ShowInventory(player);
-				continue;
-			}
-
-			Console.WriteLine($"Unknown command. Use {GO} <direction>, {LOOK}, {TAKE} <item name>, {DROP} <item name>, {INVENTORY}, or {QUIT}.");
 		}
 	}
 
@@ -149,6 +143,12 @@ public class Program
 
 	public static void ShowRoom(Room room)
 	{
+		if (!room.IsLit)
+		{
+			Console.WriteLine("It is dark. You cannot see the room or its contents.");
+			return;
+		}
+
 		Console.WriteLine($"{room.Name}: {room.Description}");
 		Console.WriteLine($"  {NORTH}: {room.North?.Name ?? "(none)"}");
 		Console.WriteLine($"  {SOUTH}: {room.South?.Name ?? "(none)"}");
@@ -179,5 +179,31 @@ public class Program
 		{
 			Console.WriteLine($"  - {item.Name}: {item.Description}");
 		}
+	}
+
+	private static string DescribeGrueEncounter(string command)
+	{
+		if (command == GO)
+		{
+			return "You rush blindly ahead and stumble upon an angry woken-up beast.";
+		}
+
+		if (command == INVENTORY)
+		{
+			return "You rummage through your belongings looking for something, but something else finds you first.";
+		}
+
+		if (command == DROP)
+		{
+			return "You drop one of your belongings. The sound it makes echoes and serves as a beacon for the thing that lurks in the darkness.";
+		}
+
+		if (command == TAKE)
+		{
+			return "You reach into the blackness. Something reaches back.";
+		}
+
+		// if (command == LOOK)
+		return "As you look into the darkness, the darkness stares back at you.";
 	}
 }
