@@ -8,6 +8,7 @@ public interface ICommand
 	public const string TAKE = "TAKE";
 	public const string DROP = "DROP";
 	public const string INVENTORY = "INVENTORY";
+	public const string USE = "USE";
 
 	string Verb { get; }
 	bool HasValidArguments(string[] words, out string message);

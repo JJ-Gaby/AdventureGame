@@ -71,4 +71,10 @@ public class Player
 		message = $"You drop the {item.Name}.";
 		return true;
 	}
+
+	public Item? FindItem(string itemName)
+	{
+		return _inventory.Find(item =>
+			string.Equals(item.Name, itemName, StringComparison.OrdinalIgnoreCase));
+	}
 }

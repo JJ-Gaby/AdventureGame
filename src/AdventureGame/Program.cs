@@ -30,6 +30,9 @@ public class Program
 		gallery.PlaceItem(copperRing);
 		archive.PlaceItem(brassToken);
 
+		Lamp lamp = new Lamp("Lamp", "A sturdy oil lamp with a metal switch.");
+		gallery.PlaceItem(lamp);
+
 		Player player = new Player(entrance);
 
 		IReadOnlyList<ICommand> commands = new ICommand[]
@@ -38,13 +41,14 @@ public class Program
 			new LookCommand(),
 			new TakeCommand(),
 			new DropCommand(),
-			new InventoryCommand()
+			new InventoryCommand(),
+			new UseCommand()
 		};
 
-		Console.WriteLine("Adventure Game — Darkness and Grue Lab");
-		Console.WriteLine($"Commands: {GO} <direction>, {LOOK}, {TAKE} <item name>, {DROP} <item name>, {INVENTORY}, {QUIT}.");
+		Console.WriteLine("Adventure Game — Inheritance and Lamp Lab");
+		Console.WriteLine($"Commands: {GO} <direction>, {LOOK}, {TAKE} <item name>, {DROP} <item name>, {USE} <item name>, {INVENTORY}, {QUIT}.");
 
-		ShowRoom(player.CurrentRoom);
+		Program.ShowRoom(player);
 
 		while (true)
 		{
@@ -53,8 +57,7 @@ public class Program
 
 			if (normalized.Length == 0)
 			{
-				Console.WriteLine($"Enter {GO} <direction>, {LOOK}, {TAKE} <item name>, " +
-					$"{DROP} <item name>, {INVENTORY}, or {QUIT}.");
+				Console.WriteLine($"Enter {GO} <direction>, {LOOK}, {TAKE} <item name>, {DROP} <item name>, {USE} <item name>, {INVENTORY}, or {QUIT}.");
 				continue;
 			}
 
@@ -78,8 +81,7 @@ public class Program
 
 			if (selected is null)
 			{
-				Console.WriteLine($"Unknown command. Use {GO} <direction>, {LOOK}, {TAKE} <item name>, " +
-					$"{DROP} <item name>, {INVENTORY}, or {QUIT}.");
+				Console.WriteLine($"Unknown command. Use {GO} <direction>, {LOOK}, {TAKE} <item name>, {DROP} <item name>, {USE} <item name>, {INVENTORY}, or {QUIT}.");
 				continue;
 			}
 
@@ -89,13 +91,17 @@ public class Program
 				continue;
 			}
 
-			bool safeRetreat = verb == GO && target == player.ReturnDirection;
-
-			if (!player.CurrentRoom.IsLit && !safeRetreat)
+			if (!HasLight(player))
 			{
-				Console.WriteLine(selected.DescribeInterruptedAttempt());
-				Console.WriteLine("A Grue devours you. You have been defeated.");
-				break;
+				bool safeRetreat = verb == GO && target == player.ReturnDirection;
+				bool safeLampReactivation =	verb == USE && player.FindItem(target) is Lamp p_lamp && !p_lamp.IsOn;
+
+				if (!safeRetreat && !safeLampReactivation)
+				{
+					Console.WriteLine(selected.DescribeInterruptedAttempt());
+					Console.WriteLine("A Grue devours you. You have been defeated.");
+					break;
+				}
 			}
 
 			selected.Execute(player, target);
@@ -107,14 +113,15 @@ public class Program
 		return input?.Trim().ToUpperInvariant() ?? QUIT;
 	}
 
-	public static void ShowRoom(Room room)
+	public static void ShowRoom(Player player)
 	{
-		if (!room.IsLit)
+		if (!HasLight(player))
 		{
 			Console.WriteLine("It is dark. You cannot see the room or its contents.");
 			return;
 		}
 
+		Room room = player.CurrentRoom;
 		Console.WriteLine($"{room.Name}: {room.Description}");
 		Console.WriteLine($"  {NORTH}: {room.North?.Name ?? "(none)"}");
 		Console.WriteLine($"  {SOUTH}: {room.South?.Name ?? "(none)"}");
@@ -124,11 +131,12 @@ public class Program
 		if (room.Items.Count == 0)
 		{
 			Console.WriteLine("  Items: (none)");
-			return;
 		}
-
-		string itemList = string.Join(", ", room.Items.Select(item => item.Name));
-		Console.WriteLine($"  Items: {itemList}");
+		else
+		{
+			string itemList = string.Join(", ", room.Items.Select(item => item.Name));
+			Console.WriteLine($"  Items: {itemList}");
+		}
 	}
 
 	public static void ShowInventory(Player player)
@@ -159,5 +167,13 @@ public class Program
 		}
 
 		return null;
+	}
+
+	public static bool HasLight(Player player)
+	{
+		Room room = player.CurrentRoom;
+		return room.IsLit ||
+			player.Inventory.OfType<Lamp>().Any(lamp => lamp.IsOn) ||
+			room.Items.OfType<Lamp>().Any(lamp => lamp.IsOn);
 	}
 }
